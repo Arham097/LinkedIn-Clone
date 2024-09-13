@@ -1,7 +1,8 @@
 const jwt = require('jsonwebtoken');
+const { sendWelcomeEmail } = require('../Email/emailHandler');
+const asyncErrorHandler = require('../Utils/asyncErrorHandler');
 const CustomError = require('../Utils/customError')
 const bcrypt = require('bcryptjs');
-const asyncErrorHandler = require('../Utils/asyncErrorHandler');
 const User = require('../Models/userModel');
 
 const signupToken = id => {
@@ -29,6 +30,13 @@ const createSendToken = (user, statusCode, res) => {
 exports.signup = asyncErrorHandler(async (req, res, next) => {
   const newUser = await User.create(req.body);
   createSendToken(newUser, 201, res);
+  const profileUrl = process.env.CLIENT_URL + '/profile/' + newUser.username;
+  try {
+    await sendWelcomeEmail(newUser.email, newUser.name, profileUrl);
+  }
+  catch (err) {
+    console.log("Error in sending Email", err);
+  }
 })
 exports.login = asyncErrorHandler(async (req, res, next) => {
   const { email, password } = req.body;
