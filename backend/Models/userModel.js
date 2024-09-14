@@ -64,7 +64,8 @@ const userSchema = new mongoose.Schema({
   ],
   connections: [{
     type: mongoose.Schema.Types.ObjectId, ref: "User"
-  }]
+  }],
+  passwordChangedAt: Date,
 
 }, { timestamps: true })
 
@@ -77,6 +78,13 @@ userSchema.pre('save', async function (next) {
 
 userSchema.methods.comparePassword = async function (password, passwordDB) {
   return (await bcrypt.compare(password, passwordDB));
+}
+userSchema.methods.isPasswordChanged = function (JwtTimestamp) {
+  if (this.passwordChangedAt) {
+    const pswdChangedTS = parseInt(this.passwordChangedAt.getTime() / 1000, 10);
+    return pswdChangedTS > JwtTimestamp
+  }
+  return false;
 }
 
 const User = mongoose.model('User', userSchema);

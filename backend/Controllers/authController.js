@@ -4,6 +4,7 @@ const asyncErrorHandler = require('../Utils/asyncErrorHandler');
 const CustomError = require('../Utils/customError')
 const bcrypt = require('bcryptjs');
 const User = require('../Models/userModel');
+const util = require('util')
 
 const signupToken = id => {
   return jwt.sign({ id }, process.env.SECRET_STRING, {
@@ -58,3 +59,43 @@ exports.logout = async (req, res, next) => {
     message: 'Logged out successfully'
   })
 }
+
+exports.protect = asyncErrorHandler(async (req, res, next) => {
+  // Read the token & check if it is exist or not
+  const token = req.cookies.jwt;
+  if (!token) {
+    const error = new CustomError("You are not logged in! Please Login to get access", 401);
+    return next(error);
+  }
+  // Validate the token
+  const decodedToken = await util.promisify(jwt.verify)(token, process.env.SECRET_STRING);
+  console.log(decodedToken);
+  if (!decodedToken) {
+    const error = new CustomError("Invalid Token! Unauthorized", 401);
+  }
+
+  // Check if the user is still exist in DB
+  const user = await User.findById(decodedToken.id);
+  if (!user) {
+    const error = new CustomError('User with this token does not exist', 401);
+    next(error);
+  };
+
+  // Check if user does not changed the password
+  const isPasswordChanged = await user.isPasswordChanged(decodedToken.iat)
+  if (isPasswordChanged) {
+    const error = new CustomError('Password has been changed recently, please  login again.', 401);
+    next(error);
+  }
+  req.user = user;
+  next();
+})
+
+exports.getCurrentUser = asyncErrorHandler(async (req, res, next) => {
+  res.status(200).json({
+    status: 'success',
+    data: {
+      user: req.user
+    }
+  })
+})
